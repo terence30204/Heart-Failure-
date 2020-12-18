@@ -1,0 +1,164 @@
+---
+title: "Final Assignment Code"
+author: "Terence Chan"
+date: "December 5, 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
+                      error = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(arm)
+library(broom)
+dat <- read.csv("C:/Users/teren/Desktop/heart.csv")
+```
+
+### Data Cleansing Code
+
+```{r}
+dat <- dat %>% 
+  rename(death = DEATH_EVENT,
+         blood_pressure = high_blood_pressure) %>% 
+  mutate(age = case_when(
+    age <= 50 ~ 0,
+    age > 50 ~ 1
+  ))
+```
+
+### Models
+
+```{r}
+mod1 <- glm(death ~ age + anaemia + diabetes + blood_pressure + sex + smoking,
+            data = dat, family = "binomial")
+#summary(mod1)
+
+mod2 <- glm(death ~ age + anaemia + diabetes + blood_pressure + sex + smoking
+            + platelets + serum_creatinine + serum_sodium, data = dat, 
+            family = "binomial")
+#summary(mod2)
+```
+
+
+### Propensity Score Models
+
+```{r}
+pmod1 <- glm(sex ~ age + anaemia + diabetes + blood_pressure + smoking,
+            data = dat, family = "binomial")
+#summary(pmod1)
+
+pmod2 <- glm(age ~ anaemia + diabetes + blood_pressure + sex + smoking,
+            data = dat, family = "binomial")
+#summary(pmod2)
+```
+
+
+```{r}
+#treatment variable is sex, used model pmod1
+dat <- augment(pmod1,data = dat, type.predict = "response") %>% 
+  dplyr::select(-.resid, -.std.resid, -.hat, -.sigma, -.cooksd) 
+
+dat <- dat %>% 
+  arrange(.fitted, sex)
+
+dat$treated <- if_else(dat$sex == 0, 0, 1) 
+
+dat$treated <- as.integer(dat$treated)
+
+matches1 <- arm::matching(z = dat$treated, 
+                         score = dat$.fitted)
+
+dat <- cbind(dat, matches1)
+
+dat_matched1 <- dat %>% 
+  filter(match.ind != 0) %>% 
+  dplyr::select(-match.ind, -pairs, -treated)
+
+propensity_score_regression1 <- 
+  lm(death ~ age + anaemia + diabetes + blood_pressure + sex + smoking,
+            data = dat_matched1)
+
+summary(propensity_score_regression1)
+huxtable::huxreg(propensity_score_regression1)
+
+
+```
+
+
+```{r}
+#treatment variable is age (based on greater and less than 50 yrs old)
+#used model 'pmod2'
+dat <- augment(pmod2, data = dat, type.predict = "response") %>% 
+  dplyr::select(-.resid, -.std.resid, -.hat, -.sigma, -.cooksd) 
+
+dat <- dat %>% 
+  arrange(.fitted, sex)
+
+dat$treated <- if_else(dat$age == 0, 0, 1)
+
+dat$treated <- as.integer(dat$treated)
+
+matches2 <- arm::matching(z = dat$treated, 
+                         score = dat$.fitted)
+dat <- cbind(dat, matches2)
+
+dat_matched2 <- dat %>% 
+  filter(match.ind != 0) %>% 
+  dplyr::select(-match.ind, -pairs, -treated)
+
+propensity_score_regression2 <- 
+  lm(death ~ age + anaemia + diabetes + blood_pressure + sex + smoking,
+            data = dat_matched2)
+
+summary(propensity_score_regression2)
+huxtable::huxreg(propensity_score_regression2)
+```
+
+### Plots
+
+```{r}
+#AGE 50 AND UNDER = 0, AGE 51 AND OVER = 1
+propensity_score_regression1 %>% 
+  ggplot(aes(x = age, y = death)) +
+  geom_bar(stat = "identity") +
+  #scale_x_discrete(label = abbreviate) + 
+  #coord_flip() + 
+  labs(x = "Age: 0.0 = Age 50 and under, 1.0 = Age 51 and over",
+       y = "Number of Deaths", 
+       title = "Number of Deaths Due to Age", 
+       caption = "Figure 1")
+  
+```
+
+
+```{r}
+#MALE = 1, WOMEN = 0
+propensity_score_regression2 %>% 
+  ggplot(aes(x = sex, y = death)) +
+  geom_bar(stat = "identity") +
+  #scale_x_discrete(label = abbreviate) + 
+  #coord_flip() + 
+  labs(x = "Sex: 0.0 = Female, 1.0 = Male", y = "Number of Deaths", 
+       title = "Number of Deaths Due to Sex", 
+       caption = "Figure 2")
+  
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
