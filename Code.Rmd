@@ -1,9 +1,4 @@
----
-title: "Final Assignment Code"
-author: "Terence Chan"
-date: "December 5, 2020"
-output: pdf_document
----
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
@@ -15,7 +10,6 @@ library(tidyverse)
 library(ggplot2)
 library(arm)
 library(broom)
-dat <- read.csv("C:/Users/teren/Desktop/heart.csv")
 ```
 
 ### Data Cleansing Code
